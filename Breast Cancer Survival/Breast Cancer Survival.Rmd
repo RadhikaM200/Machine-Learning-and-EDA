@@ -1,0 +1,332 @@
+---
+title: "Breast Cancer Survival Analysis"
+output: html_notebook: 
+    toc: yes
+    toc_depth: 5
+---
+
+# 1. Problem Statement
+
+## 1.1 Background Information
+
+The dataset contains cases from a study that was conducted between 1958 and 1970 at the University of Chicago's Billings Hospital on the survival of patients who had undergone surgery for breast cancer.
+
+## 1.2 Plan of Action
+
+We'll perform *Diagnostic Analysis* on the given dataset in order to find patterns and relationships between Data and it's various attributes. This is an old dataset and a lot of advancements have taken place in terms of treatment plans and medications to treat patients with much better results. So, this can be used to find what factors played very important roles in determining a patient's health post their operations.
+
+## 1.3 End Result
+
+We'll get the factors which contributed towards the survival status of patients post their cancer operation in the period 1958-1970.
+
+# 2. Study Questions 
+
+* **How different factors individually affect the Patient's survival after operation? **
+* **How various factors together affect the Patient's survival after operation?**
+
+# 3. Business Process
+1. The available data is already structured. We'll do Diagnostic Analysis to find patterns among data.
+2. Finally, we'll draw conclusions from our analysis
+
+# 4. Loading Packages and Libraries
+Installing the required packages and libraries
+
+```{r}
+library(tidyverse)
+```
+```{r}
+library(readxl)
+```
+
+```{r}
+library(tidyquant)
+```
+```{r}
+library(descr)
+```
+```{r}
+library(esquisse)
+```
+```{r}
+library(ggplot2)
+```
+```{r}
+library(corrplot)
+```
+
+# 5. Analysing the Data
+*Diagnostic Analysis* technique is one where historical data is interpreted and analysed to properly understand the factors leading to a cause.
+
+## 5.1 Importing Data
+```{r}
+breast_cancer = read.csv("https://raw.githubusercontent.com/insaid2018/R/master/Projects/Breast_cancer_survival.csv")
+```
+## 5.2 Reading Data
+
+- **Viewing the Dataset**
+```{r}
+sample(breast_cancer)
+```
+
+- **The Dimension of the Dataset we are working with:**
+```{r}
+dim(breast_cancer)
+```
+- **We can see there are **306 records** and **4 attributes**, out of which one is a target variable.**
+  - The 3 attributes are:
+     - **Age**
+     - ***Years_of_operation**
+     - **Pos_axillary_nodes**
+  - And, the target variable is:
+     - **Status**
+  
+## 5.3 Preprocessing the data
+
+
+### 5.3.1 Checking **NULL values** in the data.
+```{r}
+summarise(breast_cancer, sum(is.na(breast_cancer)))
+```
+- There seem to be **no null** values.
+
+
+### 5.3.2 Checking the data types of each columns.**
+```{r}
+str(breast_cancer)
+```
+This, looks good.
+Years_of_operation is primarily the year in which operation was conducted, here, it is showing as **int** type, which is fine because only the year is **not a valid date**. A valid date should have all the 3 components - mm, dd, yyyy.
+
+Since the base year is **1900**, converting the date to a more readable format:
+```{r}
+breast_cancer<-(mutate(breast_cancer, Years_of_operation = 1900+Years_of_operation))
+head(breast_cancer)
+```
+
+
+### 5.3.3 Having a look at the **overall distribution** of data.
+```{r}
+summary(breast_cancer)
+```
+- Observation:
+  - Pos_axillary_nodes is **Positively Skewed** as Mean (=4.026) > Median (=1) and it seems like **outliers** are affecting the mean.
+
+```{r}
+x <- breast_cancer$Pos_axillary_nodes
+h <- hist(x, breaks=10, col="red", xlab="Number of axillary nodes", main="Histogram with Normal Curve")
+
+xfit<- seq(min(x), max(x), length=40)
+yfit<- dnorm(xfit, mean = mean(x), sd= sd(x))
+yfit<- yfit*diff(h$mids[1:2])*length(x)
+lines(xfit, yfit, col="blue", lwd=2)
+```
+```{r}
+ggplot(breast_cancer, aes(y=Pos_axillary_nodes)) + geom_boxplot(fill='purple', color='black',  alpha=1)
+```
+- Calculating the total proportion of outliers using the **1.5*IQR Rule** 
+```{r}
+q1 <- quantile(breast_cancer$Pos_axillary_nodes, 0.25)
+q3 <- quantile(breast_cancer$Pos_axillary_nodes, 0.75)
+iqr <- q3-q1
+outliers <- filter(breast_cancer,  !between(Pos_axillary_nodes, (q1-1.5*iqr) ,  (q3+1.5*iqr)))
+print(paste("The total Proportion of outliers is : ", round(count(outliers)*100/length(x),2), "%"))
+```
+- **13.07%** is a big number to deal with. Removing or handling them by any other means will lead to **loss of information**. So, we'll not remove them all.
+
+- In order to treat the skewness a bit and make the distribution a little better, we can **remove the values from 24 onwards**, as very few points are spread over a large range. The outliers below 24 are close to each other and it looks like removing them would lead to a loss of genuine information.
+
+
+```{r}
+outliers <- filter(breast_cancer, Pos_axillary_nodes>=24)
+print(paste("The percentage of values which will be dropped is :", round(count(outliers)*100/length(x),2), "%"))
+```
+**Dropping the values**
+```{r}
+breast_cancer <- filter(breast_cancer, Pos_axillary_nodes<24)
+head(breast_cancer)
+```
+- **Plotting the density curve to see the distribution again**
+
+```{r}
+ggplot(breast_cancer, aes(x=Pos_axillary_nodes)) + geom_density(fill='green', color='black',  alpha=1)
+```
+```{r}
+ggplot(breast_cancer, aes(y=Pos_axillary_nodes)) + geom_boxplot(fill='purple', color='black',  alpha=1)
+```
+
+- **The distribution looks a bit better**
+
+
+
+## 5.4 Exploratory Data Analysis
+
+### 5.4.1 Of all the Patients, how many survived?
+
+```{r}
+ggplot(breast_cancer, aes(x=Status)) + geom_bar(color='red', fill='purple', width=0.5)
+```
+- We can see that **73.5% (=225)** patients survived 5 years or more post the operation, whereas **26.5% (=81)** patients passed away within 5 years.
+
+<br><br>
+
+**PS : It is worthy of noting that we are dealing with an imbalanced dataset here.**
+
+### 5.4.2 Lets check the relation between Age and Status
+
+```{r}
+dta1 <- density(filter(breast_cancer, Status==1)$Age)
+dta2 <- density(filter(breast_cancer, Status==2)$Age)
+
+plot(dta1, col="blue", main="Age vs Status",xlim = c(min(breast_cancer$Age), max(breast_cancer$Age)), ylim=c(0,0.04) )
+lines(dta2, col="red")
+```
+**Creating Age Bins/Groups for an elaborate understanding**
+
+- We can divide the age into groups for better analysis.
+      - Group 1: ages 30-43
+      - Group 2: ages 44-57
+      - Group 3: ages 58-71
+      - Group 4: ages 72 and above
+      
+```{r}
+# ageG = data.frame()
+breast_cancer <- mutate(breast_cancer, AgeGroups = ifelse(between(Age, 30,43), 'Group1',
+                             ifelse(between(Age, 44, 57), 'Group2',
+                             ifelse(between(Age, 58, 71), 'Group3', 'Group4'))))
+```
+      
+```{r}
+head(breast_cancer)
+```
+- **Creating a crosstab to compare the two fields with their corresponding values**
+```{r}
+crosstab(breast_cancer$AgeGroups,breast_cancer$Status)
+```
+**Analysing the above two figures**
+   - All the Groups have more patients surviving for **more than 5 years after Operation** than them **surviving for lesser time**.
+   - The difference between the two types patients is a prominent one, meaning, more had a better recovery post operation. It is very significant in **Group1, Group2** and **Group3**.
+
+
+### 5.4.3 Lets check the relation between Pos_axillary_nodes and Status.
+
+```{r}
+dta1 <- density(filter(breast_cancer, Status==1)$Pos_axillary_nodes)
+dta2 <- density(filter(breast_cancer, Status==2)$Pos_axillary_nodes)
+
+plot(dta1, col="blue", main="Pos_axillary_nodes vs Status",xlim = c(min(breast_cancer$Pos_axillary_nodes), max(breast_cancer$Pos_axillary_nodes)), ylim=c(0,0.4) )
+lines(dta2, col="red")
+```
+
+**We can see that the data is spread between values: 0-23.** <br>
+   - The values for **Status=1** (Patients surviving for more than 5 years after operation) is concentrated more between values **0-5**
+   - Most of the values for **Status=2** (Patients surviving for less than 5 years after operation) is spread across a broader range of **0-10** and fewer datapoints are spread from **15-23**.
+   
+**Creating axillary nodes Bins/Groups for an elaborate understanding**
+
+- We can divide the age into groups for better analysis.
+      - Group 1: nodes between 0-5
+      - Group 2: nodes between 6-11
+      - Group 3: nodes between 12-17
+      - Group 4: nodes more than 18 
+
+```{r}
+breast_cancer <- mutate(breast_cancer, PosGroups = ifelse(between(Pos_axillary_nodes, 0,5), 'Group1',
+                             ifelse(between(Pos_axillary_nodes, 6, 11), 'Group2',
+                             ifelse(between(Pos_axillary_nodes, 12, 17), 'Group3', 'Group4'))))
+
+head(breast_cancer)
+```
+- **Creating a crosstab to compare the two fields with their corresponding values**
+```{r}
+crosstab(breast_cancer$PosGroups,breast_cancer$Status)
+```
+
+**Analysing Fig 4:**
+   -  **Group 1** has the highest concentration of points among all the other ones.
+   So, majority of the patients had **axillary nodes between 0-5**.
+   -  **Group 1** consists of **63.54%** Patients surviving for more than 5 years, and **15.38%** Patients surviving for less than 5 years after operation.
+   -  **Group 2** consists of **6.35%** Patients surviving for more than 5 years, and **5.01%** Patients surviving for less than 5 years after operation.
+   - **Group 3** and **Group 4** have a similar trend. Lesser Patients survived for more than 5 years.  
+   
+- **Plotting a bar chart to compare PosGroups Status wise**
+
+```{r}
+ggplot(breast_cancer, aes(x=PosGroups)) + geom_bar(aes(fill= as.character(Status)), position = 'dodge')
+
+```
+
+### 5.4.4 Lets check the relation between Years_of_operation and Status
+
+```{r}
+group_by(breast_cancer, Years_of_operation)
+```
+```{r}
+breast_cancer %>% group_by(Years_of_operation) %>% count()
+```
+```{r}
+# esquisser()
+ggplot(breast_cancer) +
+ aes(x = as.character(Years_of_operation)) +
+ geom_bar(fill = "#35b779") +
+labs(x = "Years of Operation") +
+ theme_minimal()
+```
+
+**Analysing Fig 7: This dataset contains information for the period - 1958 to 1969:**
+ - Majority of operations took place in **1958 : 36 operations (~11.8%)**
+ - Second highest operations were done in the year **1964 : 31 operations (~10.1%)**
+ - The least number of operations took place in the year **1969 : 11 operations (~3.6%)**
+ 
+```{r}
+ggplot(breast_cancer, aes(x=as.character(Years_of_operation))) + geom_bar(aes(fill= as.character(Status)), position = 'dodge') + labs(x = "Years of Operation")
+```
+ **Analysing Fig 8: For the period of 1958 - 1969 :**
+   - All throughout the span, more patients survived for more than 5 years after their operations.
+   - The year **1965** saw a sudden decrease in the ratio between **Status=1 : Status=2** i.e. there was a very small difference between the two groups of surviving patients.
+   - The years **1960** and **1961** have more or less of an **ideal ratio** between the two statuses.
+ 
+### 5.4.5 Lets check the relation between Age, Pos_axillary_nodes and Status
+```{r}
+# esquisser()
+
+ggplot(breast_cancer) +
+ aes(x = Age, y = Pos_axillary_nodes, colour = as.character(Status)) +
+ geom_point(size = 1.5) +
+ scale_color_hue() +
+ theme_minimal()
+```
+ 
+ - We can observe a pattern, throughout **all ages**, for very low values of **Pos_axillary_nodes, strictly between 0-10,** majority of the points have a **Status=1**, i.e. majority of the patients survived 5 years or longer.
+- As the value of **Pos_axillary_nodes** starts increasing throughout **all ages**, the datapoints for both **Statuses** appear mixed.
+
+
+### 5.4.6 Let us check the correlation between all the variables using a heatmap
+
+```{r}
+heatmap(cor(breast_cancer[1:4]))
+```
+
+```{r}
+corrplot(cor(breast_cancer[1:4]))
+```
+**None of the values seem to be highly correlated with one another, hence, we will not face redundancy issues.**
+
+# 6. End Results
+
+1. There were outliers in Pos_axillary_nodes field, which constituted **13.07%** of the total values. Around **2.29%** values were removed to correct the skewness a bit and prevent excess loss of information.
+
+2. In the dataset at hand, **73.5%** patients survived for more than 5 years.
+
+3. Majority of the patients belong to **Ages between 44-57 (~44.5%)**, out of which **30.43%** lived for more than 5 years after their operation.
+In general, throughout all ages, We had more patients surviving for more than 5 years after operation.
+
+4. Majority of the patients with less number of axillary nodes (0-5), survived for more than 5 years after the operation.
+
+## 6.1 Hypothesis: 
+The **Hypothesis** we derived from performing **Diagnostic Analysis** on the **breast cancer survival** dataset is as follows: 
+
+      a. Patients throughout all ages, for lesser number of positive axillary nodes (between 0-5) present, or 
+      b. Patients in the younger age group (between 30-45), throughout all values of positive axillary nodes,
+        
+         have higher chances of surviving beyond 5 years post operation.
+
