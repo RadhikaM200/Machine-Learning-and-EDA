@@ -9,6 +9,7 @@ We performed **Diagnostic Analysis** in order to find patterns among the data an
 
 To get an idea about the type of data, analysis performed and the hypothesis derived,  please check the [Presentation.](https://github.com/RadhikaM200/Machine-Learning-and-EDA/blob/main/Breast%20Cancer%20Survival/Breast%20Cancer%20Survival.pptx)
 
-The detailed analysis can be found in my [R Notebook.](https://github.com/RadhikaM200/Machine-Learning-and-EDA/blob/main/Breast%20Cancer%20Survival/Breast%20Cancer%20Survival.Rmd)
+The detailed analysis can be found in my [R Notebook](https://github.com/RadhikaM200/Machine-Learning-and-EDA/blob/main/Breast%20Cancer%20Survival/Breast%20Cancer%20Survival.Rmd)
+and in the corresponding [Python Notebook.](https://github.com/RadhikaM200/Machine-Learning-and-EDA/blob/main/Breast%20Cancer%20Survival/Breast%20Cancer%20Survival.ipynb)
 
 Thank you! 
